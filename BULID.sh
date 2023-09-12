@@ -10,4 +10,4 @@ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 
 git clone -b raredisease --single-branch https://github.com/nf-core/test-datasets.git
 # mamba create -c conda-forge -c bioconda -n snakemake snakemake
-# mamba env create -f first_
+# mamba env create -f first_step_mamba.yml
