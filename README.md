@@ -5,7 +5,7 @@ Please modify the ___config.yaml___ befor using.
 
 ## Bugs to fix:
 1. mamba environment need to be bulid previously, use the first_step_mamba.yml to bulid the env and then add the path to the env to the config.ymal
-2. To run the whole workfolw, a sentry file has been added to the process. Run `snakemake --cores 2 ../results/variants/.sentinel`
+2. To run the whole workflow, a sentry file has been added to the process. Run `snakemake --cores 2 ../results/variants/.sentinel`
 
 ## Prepare the environment
 For the limitation of file size upload to Github repo, you need to download the test files and GATK
