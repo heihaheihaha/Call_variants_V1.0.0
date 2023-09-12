@@ -1,7 +1,7 @@
 # Call_variants_V1.0.0
 Preliminary test passed on Codespace.
 
-Please modify the ___config.ymal___ befor using.
+Please modify the ___config.yaml___ befor using.
 
 ## Bugs to fix:
 1. mamba environment need to be bulid previously, use the first_step_mamba.yml to bulid the env and then add the path to the env to the config.ymal
