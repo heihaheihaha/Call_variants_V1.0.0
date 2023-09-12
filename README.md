@@ -28,3 +28,24 @@ You can use the data of Raredisease pipeline of nf-core.
 ```bash
 git clone -b raredisease --single-branch https://github.com/nf-core/test-datasets.git
 ```
+## Run test on codespace
+```bash 
+bash BULID.sh
+cd
+##
+bash Miniconda3-latest-Linux-x86_64.sh
+conda init
+```
+Start a new terminal
+```bash
+cd
+bash Mambaforge-Linux-x86_64.sh
+conda init
+```
+Start a new terminal
+```
+mamba env create -f first_step_mamba.yml
+mamba create -c conda-forge -c bioconda -n snakemake snakemake
+mamba activate snakemake
+snakemake --cores 2 ../results/variants/.sentinel
+```
