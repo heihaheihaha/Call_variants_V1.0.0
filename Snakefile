@@ -85,7 +85,7 @@ rule index_bam:
 	input:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
 	output:
-		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bai"
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai"
 	shell:
 		f"{config['path_to_mamba_env']}/bin/samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
 
