@@ -11,6 +11,10 @@ def fa_dict(path0: str) -> str:
 
 ref_dict_path = fa_dict(ref_path0)
 
+rule end:
+	input:
+		f"../results/variants/{config['sample_name']}.g.vcf.gz"
+
 # Prepare environment
 rule index_reference:
 	input:
@@ -100,10 +104,3 @@ rule variant_calling:
 	shell:
 		f"{gatk} HaplotypeCaller -R {config['reference_panel_path']} -I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam -O ../results/variants/{config['sample_name']}.g.vcf.gz -ERC GVCF" # gatk haplotype caller will call the variants in the bam file
 
-rule :
-	input:
-		f"../results/variants/{config['sample_name']}.g.vcf.gz"
-	output:
-		"../results/variants/.sentinel"
-	shell:
-		"echo 'emm' > ../results/variants/.sentinel"
