@@ -24,7 +24,7 @@ rule index_reference:
 	conda:
 		"./first_step_mamba.yml"
 	shell:
-		f"bwa index {config['reference_panel_path']}" # bwa index will create the index files with the fasta file
+		f"{config['path_to_mamba_env']}/bin/bwa index {config['reference_panel_path']}" # bwa index will create the index files with the fasta file
 		
 rule fastqc: # output is the html and zip files
 	input:
