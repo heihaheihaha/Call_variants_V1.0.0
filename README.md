@@ -1,5 +1,5 @@
 # Call_variants_V1.0.0
-Preliminary test passed on Codescape.
+Preliminary test passed on Codespace.
 
 Please modify the ___config.ymal___ befor using.
 
