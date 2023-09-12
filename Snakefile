@@ -73,15 +73,6 @@ rule ADD_READ_GROUPS:
 	shell:
 		f"{gatk} AddOrReplaceReadGroups I=../results/alignments/{config['sample_name']}.bwa.markdup.bam O=../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam RGID={config['sample_name']} RGLB={config['sample_name']} RGPL=illumina RGPU=unit1 RGSM={config['sample_name']}" # gatk add read groups will add the read groups to the bam file
 	
-# rule index_bam:
-# 	input:
-# 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
-# 	output:
-# 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bai"
-# 	conda:
-# 		"./first_step_mamba.yml"
-# 	shell:
-# 		f"{config['path_to_mamba_env']}/bin/samtools index {input}" # samtools index will create the index file for the bam file
 rule dict_index:
 	input:
 		f"{config['reference_panel_path']}"
@@ -90,10 +81,18 @@ rule dict_index:
 	shell:
 		f"{gatk} CreateSequenceDictionary REFERENCE={config['reference_panel_path']} OUTPUT={ref_dict_path}"
 
+rule index_bam:
+	input:
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
+	output:
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bai"
+	shell:
+		f"{gatk} BuildBamIndex I=../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
 
 rule variant_calling:
 	input:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam",
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bai",
 		f"{config['reference_panel_path']}",
 		f"{ref_dict_path}"
 	output:
