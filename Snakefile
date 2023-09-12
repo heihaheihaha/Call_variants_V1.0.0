@@ -79,7 +79,7 @@ rule dict_index:
 	output:
 		f"{ref_dict_path}"
 	shell:
-		f"{config['path_to_mamba_env']}/bin/samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
+		f"{gatk} CreateSequenceDictionary REFERENCE={config['reference_panel_path']} OUTPUT={ref_dict_path}"
 
 rule index_bam:
 	input:
@@ -87,7 +87,7 @@ rule index_bam:
 	output:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bai"
 	shell:
-		f"{gatk} BuildBamIndex I=../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
+		f"{config['path_to_mamba_env']}/bin/samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
 
 rule variant_calling:
 	input:
