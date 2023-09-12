@@ -1,4 +1,4 @@
-gatk_path: "/home/codespace/gatk-4.4.0.0/gatk"
+gatk_path: "./bin/gatk-4.4.0.0/gatk"
 
 R1_path: "/home/codespace/test-datasets/testdata/1_171015_HHT5NDSXX_earlycasualcaiman_XXXXXX_1.fastq.gz"
 R2_path: "/home/codespace/test-datasets/testdata/1_171015_HHT5NDSXX_earlycasualcaiman_XXXXXX_2.fastq.gz"
