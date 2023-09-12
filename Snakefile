@@ -92,7 +92,7 @@ rule index_bam:
 rule variant_calling:
 	input:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam",
-		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bai",
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai",
 		f"{config['reference_panel_path']}",
 		f"{ref_dict_path}"
 	output:
