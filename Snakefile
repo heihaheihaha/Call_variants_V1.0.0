@@ -90,6 +90,8 @@ rule index_bam:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
 	output:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai"
+	conda:
+		"./first_step_mamba.yml"
 	shell:
 		f"samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
 

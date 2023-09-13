@@ -43,6 +43,9 @@ bash Mambaforge-Linux-x86_64.sh
 conda init
 ```
 Start a new terminal
+```bash
+mamba init
+```
 ```
 mamba env create -f first_step_mamba.yml
 mamba create -c conda-forge -c bioconda -n snakemake snakemake
