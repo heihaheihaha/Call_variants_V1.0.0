@@ -11,6 +11,10 @@ def fa_dict(path0: str) -> str:
 
 ref_dict_path = fa_dict(ref_path0)
 
+rule end:
+	input:
+		f"../results/variants/{config['sample_name']}.g.vcf.gz"
+
 # Prepare environment
 rule index_reference:
 	input:
@@ -24,7 +28,7 @@ rule index_reference:
 	conda:
 		"./first_step_mamba.yml"
 	shell:
-		f"{config['path_to_mamba_env']}/bin/bwa index {config['reference_panel_path']}" # bwa index will create the index files with the fasta file
+		f"bwa index {config['reference_panel_path']}" # bwa index will create the index files with the fasta file
 		
 rule fastqc: # output is the html and zip files
 	input:
@@ -36,7 +40,7 @@ rule fastqc: # output is the html and zip files
 	conda:
 		"./first_step_mamba.yml"
 	shell:
-		f"{config['path_to_mamba_env']}/bin/fastqc {input} -o ../results/fastqc/"
+		f"fastqc {input} -o ../results/fastqc/"
 
 rule align_readers:
 	input:
@@ -54,7 +58,7 @@ rule align_readers:
 		"./first_step_mamba.yml"
 	threads: 8
 	shell: #f"bwa mem -t {threads} {input.reference} {input.R1_path} {input.R2_path} | samtools sort > {output}" # bwa mem will align the reads to the reference panel
-		f"{config['path_to_mamba_env']}/bin/bwa mem {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | {config['path_to_mamba_env']}/bin/samtools sort > ../results/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
+		f"bwa mem {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | {config['path_to_mamba_env']}/bin/samtools sort > ../results/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
 
 rule mark_duplicates:
 	input:
@@ -86,8 +90,10 @@ rule index_bam:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
 	output:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai"
+	conda:
+		"./first_step_mamba.yml"
 	shell:
-		f"{config['path_to_mamba_env']}/bin/samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
+		f"samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
 
 rule variant_calling:
 	input:
@@ -100,10 +106,3 @@ rule variant_calling:
 	shell:
 		f"{gatk} HaplotypeCaller -R {config['reference_panel_path']} -I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam -O ../results/variants/{config['sample_name']}.g.vcf.gz -ERC GVCF" # gatk haplotype caller will call the variants in the bam file
 
-rule :
-	input:
-		f"../results/variants/{config['sample_name']}.g.vcf.gz"
-	output:
-		"../results/variants/.sentinel"
-	shell:
-		"echo 'emm' > ../results/variants/.sentinel"
