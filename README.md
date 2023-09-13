@@ -47,5 +47,5 @@ Start a new terminal
 mamba env create -f first_step_mamba.yml
 mamba create -c conda-forge -c bioconda -n snakemake snakemake
 mamba activate snakemake
-snakemake --cores 2 ../results/variants/.sentinel
+snakemake --cores 2 
 ```
