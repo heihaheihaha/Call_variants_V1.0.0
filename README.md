@@ -22,6 +22,7 @@ rm gatk-4.4.0.0.zip
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 ```
+Silent installation may cause some path issues, so manual installation is recommended.
 
 ## Test data
 You can use the data of Raredisease pipeline of nf-core.
