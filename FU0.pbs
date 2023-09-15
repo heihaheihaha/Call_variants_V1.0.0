@@ -8,5 +8,5 @@
 #PBS -m abe
 #PBS -M heihaheihaha@outlook.com
 
-cd 
+cd /data/wangty/Call_variants_V1.0.0
 /data/wangty/mambaforge/envs/snakemake/bin/snakemake --cores 10 --use-conda
