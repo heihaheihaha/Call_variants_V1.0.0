@@ -139,8 +139,7 @@ rule IndexFeatureFile: # index the known sites(dbsnp, vcf file, gz)
 	output:
 		f"{config['known_sites']}.tbi"
 	shell:
-		f"echo 'Can not found index of {config['known_sites']}, start to bulid index.'
-		 	{gatk} IndexFeatureFile \\
+		f"{gatk} IndexFeatureFile \\
 			-I {config['known_sites']}"
 
 rule BaseRecalibrator:
