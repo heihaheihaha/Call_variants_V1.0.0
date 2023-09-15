@@ -8,3 +8,9 @@ reference_panel_path: "/data/wangty/my_ref/hg38.fa"
 sample_name: "FU0"
 
 known_sites: "/data/wangty/my_ref/dbsnp_138.hg38.vcf.gz"
+
+lane: "L1"
+
+platform: "Illumina"
+
+output_dir: "/data/wangty/lyp_trio/result"
