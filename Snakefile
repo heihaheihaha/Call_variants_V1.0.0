@@ -139,8 +139,8 @@ rule IndexFeatureFile: # index the known sites(dbsnp, vcf file, gz)
 	output:
 		f"{config['known_sites']}.tbi"
 	shell:
-		f"{gatk} IndexFeatureFile \\
-			-I {config['known_sites']}"
+		f"""{gatk} IndexFeatureFile \\
+			-I {config['known_sites']}"""
 
 rule BaseRecalibrator:
 	input: 
