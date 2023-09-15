@@ -1,7 +1,7 @@
 gatk_path: "/data/wangty/my_bin/gatk-4.4.0.0/gatk"
 
-R1_path: "/data/wangty/lyp_trio/21Y13924FU0.R1.clean.fastq.gz"
-R2_path: "/data/wangty/lyp_trio/21Y13924FU0.R2.clean.fastq.gz"
+R1_path: "/data/wangty/lyp_trio/ylp/21Y13924FU0.R1.clean.fastq.gz"
+R2_path: "/data/wangty/lyp_trio/ylp/21Y13924FU0.R2.clean.fastq.gz"
 
 reference_panel_path: "/data/wangty/my_ref/hg38.fa"
 
