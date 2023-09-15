@@ -52,5 +52,5 @@ mamba init
 mamba env create -f first_step_mamba.yml
 mamba create -c conda-forge -c bioconda -n snakemake snakemake
 mamba activate snakemake
-snakemake --cores 2 
+snakemake --cores 2 --use-conda
 ```
