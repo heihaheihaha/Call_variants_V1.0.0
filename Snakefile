@@ -1,7 +1,6 @@
 import os
 import re
 
-
 configfile: "config.yaml"
 gatk = config["gatk_path"]
 ref_path0 = config["reference_panel_path"]
@@ -60,7 +59,8 @@ rule align_readers:
 		"./first_step_mamba.yml"
 	threads: 8
 	shell: #f"bwa mem -t {threads} {input.reference} {input.R1_path} {input.R2_path} | samtools sort > {output}" # bwa mem will align the reads to the reference panel
-		f"bwa mem {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | samtools sort > ../results/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
+		f"""bwa mem {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | \\
+		samtools sort > ../results/alignments/{config['sample_name']}.bwa.bam""" # bwa mem will align the reads to the reference panel
 
 rule mark_duplicates:
 	input:
@@ -69,7 +69,10 @@ rule mark_duplicates:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.bam",
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.metrics"
 	shell:
-		f"{gatk} MarkDuplicates I=../results/alignments/{config['sample_name']}.bwa.bam O=../results/alignments/{config['sample_name']}.bwa.markdup.bam M=../results/alignments/{config['sample_name']}.bwa.markdup.metrics" # sambamba markdup will mark the duplicates in the bam file
+		f"""{gatk} MarkDuplicates \\
+			I=../results/alignments/{config['sample_name']}.bwa.bam \\
+			O=../results/alignments/{config['sample_name']}.bwa.markdup.bam \\
+			M=../results/alignments/{config['sample_name']}.bwa.markdup.metrics""" # sambamba markdup will mark the duplicates in the bam file
 
 rule ADD_READ_GROUPS:
 	input:
@@ -77,7 +80,13 @@ rule ADD_READ_GROUPS:
 	output:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
 	shell:
-		f"{gatk} AddOrReplaceReadGroups I=../results/alignments/{config['sample_name']}.bwa.markdup.bam O=../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam RGID={config['sample_name']} RGLB={config['sample_name']} RGPL=illumina RGPU=unit1 RGSM={config['sample_name']}" # gatk add read groups will add the read groups to the bam file
+		f"""{gatk} AddOrReplaceReadGroups \\
+			I=../results/alignments/{config['sample_name']}.bwa.markdup.bam \\
+			O=../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			RGID={config['sample_name']} RGLB={config['sample_name']} \\
+			RGPL=illumina \\
+			RGPU=unit1 \\
+			RGSM={config['sample_name']}""" 
 
 rule dict_index:
 	input:
@@ -103,7 +112,9 @@ rule IndexFeatureFile:
 	output:
 		f"{config['known_sites']}.tbi"
 	shell:
-		f"echo 'Can not found index of {config['known_sites']}, start to bulid index.'\n {gatk} IndexFeatureFile -I {config['known_sites']}"
+		f"echo 'Can not found index of {config['known_sites']}, start to bulid index.'
+		 	{gatk} IndexFeatureFile \\
+			-I {config['known_sites']}"
 
 rule BaseRecalibrator:
 	input: 
@@ -115,7 +126,12 @@ rule BaseRecalibrator:
 	output: 
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
 	shell:
-		f"{gatk} BaseRecalibrator -R {config['reference_panel_path']} -I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam -O ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table --known-sites {config['known_sites']}"
+		f"""{gatk} BaseRecalibrator \\
+			-R {config['reference_panel_path']} \\
+			-I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			-O ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
+			--known-sites {config['known_sites']}""" 
+
 
 rule ApplyBQSR:
 	input:
@@ -123,7 +139,10 @@ rule ApplyBQSR:
 	output:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
 	shell:
-		f"{gatk} ApplyBQSR -R {config['reference_panel_path']} -I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam -O ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam --bqsr-recal-file ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
+		f"""{gatk} ApplyBQSR -R {config['reference_panel_path']} \\
+			-I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			-O ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			--bqsr-recal-file ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"""
 
 rule index_bam2:
 	input:
@@ -135,6 +154,36 @@ rule index_bam2:
 	shell:
 		f"samtools index ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam" # gatk build bam index will create the index file for the bam file
 
+rule BaseRecalibrator2:
+	input:
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
+		f"{config['reference_panel_path']}",
+		f"{config['known_sites']}",
+		f"{config['known_sites']}.tbi"
+	output:
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
+	shell:
+		f"""{gatk} BaseRecalibrator \\
+			-R {config['reference_panel_path']} \\
+			-I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			-O ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
+			--known-sites {config['known_sites']}"""
+
+rule AnalyzeCovariates:
+	input:
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
+	output:
+		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf"
+	conda:
+		
+	shell:
+		f"""{gatk} AnalyzeCovariates \\
+			-before ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
+			-after ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
+			-plots ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf"""
+
+
 rule HaplotypeCaller:
 	input:
 		f"../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
@@ -144,5 +193,8 @@ rule HaplotypeCaller:
 	output:
 		f"../results/variants/{config['sample_name']}.g.vcf.gz"
 	shell:
-		f"{gatk} HaplotypeCaller -R {config['reference_panel_path']} -I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam -O ../results/variants/{config['sample_name']}.g.vcf.gz -ERC GVCF" # gatk haplotype caller will call the variants in the bam file
-
+		f"""{gatk} HaplotypeCaller \\
+			-R {config['reference_panel_path']} \\
+			-I ../results/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			-O ../results/variants/{config['sample_name']}.g.vcf.gz \\
+			-ERC GVCF""" 

@@ -1,10 +1,10 @@
-gatk_path: "/home/codespace/gatk-4.4.0.0/gatk"
+gatk_path: "/data/wangty/my_bin/gatk-4.4.0.0/gatk"
 
-R1_path: "/home/codespace/test-datasets/testdata/1_171015_HHT5NDSXX_earlycasualcaiman_XXXXXX_1.fastq.gz"
-R2_path: "/home/codespace/test-datasets/testdata/1_171015_HHT5NDSXX_earlycasualcaiman_XXXXXX_2.fastq.gz"
+R1_path: "/data/wangty/lyp_trio/21Y13924FU0.R1.clean.fastq.gz"
+R2_path: "/data/wangty/lyp_trio/21Y13924FU0.R2.clean.fastq.gz"
 
-reference_panel_path: "/home/codespace/test-datasets/reference/hg38.chrM.fa"
+reference_panel_path: "/data/wangty/my_ref/hg38.fa"
 
-sample_name: "test0"
+sample_name: "FU0"
 
-known_sites: "/home/codespace/test-datasets/reference/dbsnp_-138-.vcf.gz"
+known_sites: "/data/wangty/my_ref/dbsnp_138.hg38.vcf.gz"
