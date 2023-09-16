@@ -14,8 +14,8 @@ ref_dict_path = fa_dict(ref_path0)
 
 rule end:
 	input:
-		f"{'output_dir'}/variants/{config['sample_name']}.filtered.vcf.gz", # trigger the rule HaplotypeCaller, may change later
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf", # trigger the rule AnalyzeCovariates
+		f"{config['output_dir']}/variants/{config['sample_name']}.filtered.vcf.gz", # trigger the rule HaplotypeCaller, may change later
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf", # trigger the rule AnalyzeCovariates
 		f"{ref_dict_path}" # trigger the rule dict_index
 
 # Prepare environment
@@ -38,12 +38,12 @@ rule fastqc: # output is the html and zip files
 		f"{config['R1_path']}",
 		f"{config['R2_path']}"
 	output:
-		f"{'output_dir'}/fastqc/{config['sample_name']}_fastqc.html"
-		f"{'output_dir'}/fastqc/{config['sample_name']}_fastqc.zip"
+		f"{config['output_dir']}/fastqc/{config['sample_name']}_fastqc.html"
+		f"{config['output_dir']}/fastqc/{config['sample_name']}_fastqc.zip"
 	conda:
 		"./first_step_mamba.yml"
 	shell:
-		f"fastqc {input} -o {'output_dir'}/fastqc/"
+		f"fastqc {input} -o {config['output_dir']}/fastqc/"
 
 rule align_readers:
 	input:
@@ -56,38 +56,38 @@ rule align_readers:
 		f"{config['R1_path']}",
 		f"{config['R2_path']}"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.bam"
 	conda:
 		"./first_step_mamba.yml"
 	threads: 8
 	shell: #f"bwa mem -t {threads} {input.reference} {input.R1_path} {input.R2_path} | samtools sort > {output}" # bwa mem will align the reads to the reference panel
 		f"""bwa mem {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | \\
-		samtools sort > {'output_dir'}/alignments/{config['sample_name']}.bwa.bam""" # bwa mem will align the reads to the reference panel
+		samtools sort > {config['output_dir']}/alignments/{config['sample_name']}.bwa.bam""" # bwa mem will align the reads to the reference panel
 
 rule mark_duplicates:
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.bam"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.bam",
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.metrics"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.metrics"
 	shell:
-		f"""{gatk} MarkDuplicates \\
-			I={'output_dir'}/alignments/{config['sample_name']}.bwa.bam \\
-			O={'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.bam \\
-			M={'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.metrics""" # sambamba markdup will mark the duplicates in the bam file
+		f"""{gatk} MarkDuplicatesSpark \\
+			I={config['output_dir']}/alignments/{config['sample_name']}.bwa.bam \\
+			O={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam \\
+			M={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.metrics""" # sambamba markdup will mark the duplicates in the bam file
 
 rule AddOrReplaceReadGroups: # Provide information for BQSR
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
 	shell:
 		f"""{gatk} AddOrReplaceReadGroups \\
-			I={'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.bam \\
-			O={'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			I={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam \\
+			O={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
 			RGID={config['sample_name']} \\
 			RGLB=lib1 \\
-			RGPL={config['platform']} \\ 
+			RGPL={config['platform']} \\
 			RGPU={config['lane']} \\
 			RGSM={config['sample_name']} \\
 			CREATE_INDEX=True
@@ -125,13 +125,13 @@ rule dict_index:
 
 rule index_bam: 
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai"
 	conda:
 		"./first_step_mamba.yml"
 	shell:
-		f"samtools index {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
+		f"samtools index {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam" # gatk build bam index will create the index file for the bam file
 
 rule IndexFeatureFile: # index the known sites(dbsnp, vcf file, gz)
 	input:
@@ -142,110 +142,122 @@ rule IndexFeatureFile: # index the known sites(dbsnp, vcf file, gz)
 		f"""{gatk} IndexFeatureFile \\
 			-I {config['known_sites']}"""
 
+rule fasta_faidx:
+	input:
+		f"{config['reference_panel_path']}"
+	output:
+		f"{config['reference_panel_path']}.fai"
+	conda:
+		"./first_step_mamba.yml"
+	shell:
+		f"samtools faidx {config['reference_panel_path']}"
+	# samtools faidx will create the index file for the fasta file
+
 rule BaseRecalibrator:
 	input: 
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai",
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam",
 		f"{config['reference_panel_path']}",
+		f"{config['reference_panel_path']}.fai",
 		f"{config['known_sites']}",
 		f"{config['known_sites']}.tbi"
 	output: 
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
 	shell:
-		f"""{gatk} BaseRecalibrator \\
+		f"""{gatk} BaseRecalibratorSpark \\
 			-R {config['reference_panel_path']} \\
-			-I {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
-			-O {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
+			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
 			--known-sites {config['known_sites']}""" 
 
 rule ApplyBQSR:
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
 	shell:
-		f"""{gatk} ApplyBQSR -R {config['reference_panel_path']} \\
-			-I {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
-			-O {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
-			--bqsr-recal-file {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"""
+		f"""{gatk} ApplyBQSRSpark -R {config['reference_panel_path']} \\
+			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			--bqsr-recal-file {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"""
 
 rule index_bam2:
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai"
 	conda:
 		"./first_step_mamba.yml"
 	shell:
-		f"samtools index {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam" # gatk build bam index will create the index file for the bam file
+		f"samtools index {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam" # gatk build bam index will create the index file for the bam file
 
 rule BaseRecalibrator2:
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
 		f"{config['reference_panel_path']}",
 		f"{config['known_sites']}",
 		f"{config['known_sites']}.tbi"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
 	shell:
-		f"""{gatk} BaseRecalibrator \\
+		f"""{gatk} BaseRecalibratorSpark \\
 			-R {config['reference_panel_path']} \\
-			-I {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
-			-O {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
+			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
 			--known-sites {config['known_sites']}"""
 
 rule AnalyzeCovariates:
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
 	output:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf"
 	conda:
 		"./gatk_R_plot.yml"
 	shell:
 		f"""{gatk} AnalyzeCovariates \\
-			-before {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
-			-after {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
-			-plots {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf"""
+			-before {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
+			-after {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
+			-plots {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf"""
 
 
 rule HaplotypeCaller:
 	input:
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
-		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
 		f"{config['reference_panel_path']}"
 	output:
-		f"{'output_dir'}/variants/{config['sample_name']}.g.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz"
 	shell:
-		f"""{gatk} HaplotypeCaller \\
+		f"""{gatk} HaplotypeCallerSpark \\
 			-R {config['reference_panel_path']} \\
-			-I {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
-			-O {'output_dir'}/variants/{config['sample_name']}.g.vcf.gz \\
+			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz \\
 			-ERC GVCF""" 
 # Notice: HaplotypeCaller GVCF 
 rule GenotypeGVCFs:
 	input:
-		f"{'output_dir'}/variants/{config['sample_name']}.g.vcf.gz",
+		f"{config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz",
 		f"{config['reference_panel_path']}"
 	output:
-		f"{'output_dir'}/variants/{config['sample_name']}.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.vcf.gz"
 	shell:
 		f"""{gatk} GenotypeGVCFs \\
 			-R {config['reference_panel_path']} \\
-			-V {'output_dir'}/variants/{config['sample_name']}.g.vcf.gz \\
-			-O {'output_dir'}/variants/{config['sample_name']}.vcf.gz"""
+			-V {config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.vcf.gz"""
 
 rule VariantFiltration:
 	input:
-		f"{'output_dir'}/variants/{config['sample_name']}.vcf.gz",
+		f"{config['output_dir']}/variants/{config['sample_name']}.vcf.gz",
 		f"{config['reference_panel_path']}"
 	output:
-		f"{'output_dir'}/variants/{config['sample_name']}.filtered.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.filtered.vcf.gz"
 	shell:
 		f"""{gatk} VariantFiltration \\
 			-R {config['reference_panel_path']} \\
-			-V {'output_dir'}/variants/{config['sample_name']}.vcf.gz \\
-			-O {'output_dir'}/variants/{config['sample_name']}.filtered.vcf.gz \\
+			-V {config['output_dir']}/variants/{config['sample_name']}.vcf.gz \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.filtered.vcf.gz \\
 			--filter-expression "QD < 2.0 || FS > 60.0 || MQ < 40.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0" \\
 			--filter-name "my_snp_filter" """
 	# QD<2.0、FS>60.0、SOR>3.0、MQ<40.0、MQRankSum < -12.5 和 ReadPosRankSum < -8.0
