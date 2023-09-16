@@ -87,7 +87,7 @@ rule AddOrReplaceReadGroups: # Provide information for BQSR
 			O={'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
 			RGID={config['sample_name']} \\
 			RGLB=lib1 \\
-			RGPL={config['platform']} \\ 
+			RGPL={config['platform']} \\
 			RGPU={config['lane']} \\
 			RGSM={config['sample_name']} \\
 			CREATE_INDEX=True
