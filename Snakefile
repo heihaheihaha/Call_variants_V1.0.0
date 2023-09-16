@@ -194,6 +194,7 @@ rule BaseRecalibrator2:
 	input:
 		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
 		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
+		f"{config['reference_panel_path']}.fai",
 		f"{config['reference_panel_path']}",
 		f"{config['known_sites']}",
 		f"{config['known_sites']}.tbi"
