@@ -1,16 +1,16 @@
-gatk_path: "~/bin/gatk-4.4.0.0/gatk"
+gatk_path: "/data/wangty/my_bin/gatk-4.4.0.0/gatk"
 
-R1_path: "~/GATK/ljy_family/3_WES/19B2284091Proband/191109_I13_V300033256_L1_19L2284091-95/V300033256_L01_95_1.fq.gz"
-R2_path: "~/GATK/ljy_family/3_WES/19B2284091Proband/191109_I13_V300033256_L1_19L2284091-95/V300033256_L01_95_2.fq.gz"
+R1_path: "/data/wangty/lyp_trio/ylp/21Y13924MU0.R1.clean.fastq.gz"
+R2_path: "/data/wangty/lyp_trio/ylp/21Y13924MU0.R2.clean.fastq.gz"
 
-reference_panel_path: "~/GATK/refs/hg38.fa"
+reference_panel_path: "/data/wangty/my_ref/hg38.fa"
 
-sample_name: "FU0"
+sample_name: "MU0"
 
-known_sites: "~/GATK/refs/Homo_sapiens_assembly38.dbsnp138.vcf.gz"
+known_sites: "/data/wangty/my_ref/dbsnp_138.hg38.vcf.gz"
 
-lane: "L1"
+lane: "unit1"
 
 platform: "Illumina"
 
-output_dir: "~/GATK/result"
+output_dir: "/data/wangty/lyp_trio/result"
