@@ -61,8 +61,7 @@ rule align_readers:
 		"./first_step_mamba.yml"
 	threads: 8
 	shell: #f"bwa mem -t {threads} {input.reference} {input.R1_path} {input.R2_path} | samtools sort > {output}" # bwa mem will align the reads to the reference panel
-		f"""bwa mem {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | \\
-		samtools sort > {config['output_dir']}/alignments/{config['sample_name']}.bwa.bam""" # bwa mem will align the reads to the reference panel
+		"bwa mem -t {threads}" + f"{config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | samtools sort > {config['output_dir']}/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
 
 rule mark_duplicates:
 	input:
