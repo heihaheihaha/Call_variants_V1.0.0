@@ -164,7 +164,7 @@ rule ApplyBQSR:
 	output:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
 	shell:
-		f"""{gatk} ApplyBQSR -R {config['reference_panel_path']} \\
+		f"""{gatk} ApplyBQSRSpark -R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
 			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
 			--bqsr-recal-file {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"""
@@ -201,7 +201,7 @@ rule BaseRecalibrator2:
 	output:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
 	shell:
-		f"""{gatk} BaseRecalibrator \\
+		f"""{gatk} BaseRecalibratorSpark \\
 			-R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
 			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
