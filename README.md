@@ -49,8 +49,8 @@ Start a new terminal
 mamba init
 ```
 ```
-mamba env create -f first_step_mamba.yml
 mamba create -c conda-forge -c bioconda -n snakemake snakemake
 mamba activate snakemake
-snakemake --cores 2 --use-conda
+snakemake --cores 2 --use-conda --conda-create-envs-only
+snakemake --cores 2 --use-conda 
 ```
