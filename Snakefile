@@ -71,7 +71,7 @@ rule mark_duplicates:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam",
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.metrics"
 	shell:
-		f"""{gatk} MarkDuplicates \\
+		f"""{gatk} MarkDuplicatesSpark \\
 			I={config['output_dir']}/alignments/{config['sample_name']}.bwa.bam \\
 			O={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam \\
 			M={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.metrics""" # sambamba markdup will mark the duplicates in the bam file
@@ -142,11 +142,23 @@ rule IndexFeatureFile: # index the known sites(dbsnp, vcf file, gz)
 		f"""{gatk} IndexFeatureFile \\
 			-I {config['known_sites']}"""
 
+rule fasta_faidx:
+	input:
+		f"{config['reference_panel_path']}"
+	output:
+		f"{config['reference_panel_path']}.fai"
+	conda:
+		"./first_step_mamba.yml"
+	shell:
+		f"samtools faidx {config['reference_panel_path']}"
+	# samtools faidx will create the index file for the fasta file
+
 rule BaseRecalibrator:
 	input: 
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bai",
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam",
 		f"{config['reference_panel_path']}",
+		f"{config['reference_panel_path']}.fai",
 		f"{config['known_sites']}",
 		f"{config['known_sites']}.tbi"
 	output: 
@@ -179,22 +191,10 @@ rule index_bam2:
 	shell:
 		f"samtools index {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam" # gatk build bam index will create the index file for the bam file
 
-rule fasta_faidx:
-	input:
-		f"{config['reference_panel_path']}"
-	output:
-		f"{config['reference_panel_path']}.fai"
-	conda:
-		"./first_step_mamba.yml"
-	shell:
-		f"samtools faidx {config['reference_panel_path']}"
-	# samtools faidx will create the index file for the fasta file
-
 rule BaseRecalibrator2:
 	input:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam",
-		f"{config['reference_panel_path']}.fai",
 		f"{config['reference_panel_path']}",
 		f"{config['known_sites']}",
 		f"{config['known_sites']}.tbi"
