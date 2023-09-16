@@ -179,6 +179,17 @@ rule index_bam2:
 	shell:
 		f"samtools index {'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam" # gatk build bam index will create the index file for the bam file
 
+rule fasta_faidx:
+	input:
+		f"{config['reference_panel_path']}"
+	output:
+		f"{config['reference_panel_path']}.fai"
+	conda:
+		"./first_step_mamba.yml"
+	shell:
+		f"samtools faidx {config['reference_panel_path']}"
+	# samtools faidx will create the index file for the fasta file
+
 rule BaseRecalibrator2:
 	input:
 		f"{'output_dir'}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.bai",
