@@ -61,29 +61,17 @@ rule align_readers:
 		"./first_step_mamba.yml"
 	threads: 8
 	shell: #f"bwa mem -t {threads} {input.reference} {input.R1_path} {input.R2_path} | samtools sort > {output}" # bwa mem will align the reads to the reference panel
-		"bwa mem -t {threads}" + f"{config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | samtools sort > {config['output_dir']}/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
-
-rule mark_duplicates:
-	input:
-		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.bam"
-	output:
-		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam",
-		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.metrics"
-	shell:
-		f"""{gatk} MarkDuplicatesSpark \\
-			I={config['output_dir']}/alignments/{config['sample_name']}.bwa.bam \\
-			O={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam \\
-			M={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.metrics""" # sambamba markdup will mark the duplicates in the bam file
+		"bwa mem -t {threads}" + f" {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | samtools sort > {config['output_dir']}/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
 
 rule AddOrReplaceReadGroups: # Provide information for BQSR
 	input:
-		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.bam"
 	output:
-		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam"
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.rg.bam"
 	shell:
 		f"""{gatk} AddOrReplaceReadGroups \\
-			I={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.bam \\
-			O={config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			I={config['output_dir']}/alignments/{config['sample_name']}.bwa.bam \\
+			O={config['output_dir']}/alignments/{config['sample_name']}.bwa.rg.bam \\
 			RGID={config['sample_name']} \\
 			RGLB=lib1 \\
 			RGPL={config['platform']} \\
@@ -113,6 +101,19 @@ rule AddOrReplaceReadGroups: # Provide information for BQSR
 # The {LANE} indicates the lane of the flow cell and the {SAMPLE_BARCODE} is a sample/library-specific identifier. 
 # Although the PU is not required by GATK but takes precedence over ID for base recalibration if it is present. 
 # In the example shown earlier, two read group fields, ID and PU, appropriately differentiate flow cell lane, marked by .2, a factor that contributes to batch effects.
+
+rule mark_duplicates:
+	input:
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.rg.bam"
+	output:
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam",
+		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.metrics"
+	shell:
+		f"""{gatk} MarkDuplicatesSpark \\
+			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.rg.bam \\
+			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
+			-M {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.metrics""" # sambamba markdup will mark the duplicates in the bam file
+
 
 rule dict_index:
 	input:
