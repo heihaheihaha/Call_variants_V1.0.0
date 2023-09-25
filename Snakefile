@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 
 configfile: "config.yaml"
 gatk = config["gatk_path"]
@@ -12,10 +13,20 @@ def fa_dict(path0: str) -> str:
 
 ref_dict_path = fa_dict(ref_path0)
 
+db = ""
+for i in config["category"].split("-"):
+    db += f"-{i} Y "
+
+if ('ASD' in {config['panel_type']}):
+	getVar2_flag = 1
+else:
+	getVar2_flag = 0
+
 rule end:
 	input:
-		f"{config['output_dir']}/variants/{config['sample_name']}.filtered.vcf.gz", # trigger the rule HaplotypeCaller, may change later
+		f"{config['output_dir']}/variants/{config['sample_name']}.annovar", # trigger the rule HaplotypeCaller, may change later
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf", # trigger the rule AnalyzeCovariates
+		f"{config['output_dir']}/variants/{config['sample_name']}.strict.xls",
 		f"{ref_dict_path}" # trigger the rule dict_index
 
 # Prepare environment
@@ -59,7 +70,7 @@ rule align_readers:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.bam"
 	conda:
 		"./first_step_mamba.yml"
-	threads: 8
+	threads: 16
 	shell: #f"bwa mem -t {threads} {input.reference} {input.R1_path} {input.R2_path} | samtools sort > {output}" # bwa mem will align the reads to the reference panel
 		"bwa mem -t {threads}" + f" {config['reference_panel_path']} {config['R1_path']} {config['R2_path']} | samtools sort > {config['output_dir']}/alignments/{config['sample_name']}.bwa.bam" # bwa mem will align the reads to the reference panel
 
@@ -247,27 +258,236 @@ rule GenotypeGVCFs:
 			-V {config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz \\
 			-O {config['output_dir']}/variants/{config['sample_name']}.vcf.gz"""
 
-rule VariantFiltration:
+rule selectvariants_snp:
 	input:
 		f"{config['output_dir']}/variants/{config['sample_name']}.vcf.gz",
 		f"{config['reference_panel_path']}"
 	output:
-		f"{config['output_dir']}/variants/{config['sample_name']}.filtered.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz"
+	shell:
+		f"""{gatk} SelectVariants \\
+			-R {config['reference_panel_path']} \\
+			-V {config['output_dir']}/variants/{config['sample_name']}.vcf.gz \\
+			-select-type-to-include SNP \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz"""
+
+rule VariantFiltration:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz",
+		f"{config['reference_panel_path']}"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz"
 	shell:
 		f"""{gatk} VariantFiltration \\
 			-R {config['reference_panel_path']} \\
-			-V {config['output_dir']}/variants/{config['sample_name']}.vcf.gz \\
-			-O {config['output_dir']}/variants/{config['sample_name']}.filtered.vcf.gz \\
-			--filter-expression "QD < 2.0 || FS > 60.0 || MQ < 40.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0" \\
-			--filter-name "my_snp_filter" """
-	# QD<2.0、FS>60.0、SOR>3.0、MQ<40.0、MQRankSum < -12.5 和 ReadPosRankSum < -8.0
-
-			# --filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
-			# --filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
-			# --filter-expression 'FS>60.0' --filter-name 'HIGH_FS' \\
-			# --filter-expression 'MQ<40.0' --filter-name 'LOW_MQ' \\
-			# --filter-expression 'MQRankSum<-12.5' --filter-name 'LOW_MQRS' \\
-			# --filter-expression 'ReadPosRankSum<-8.0' --filter-name 'LOW_RPRS' \\
-			# --filter-expression 'SOR>3.0' --filter-name 'HIGH_SOR \\
+			-V {config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz \\
+			--filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
+			--filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
+			--filter-expression 'FS>60.0' --filter-name 'HIGH_FS' \\
+			--filter-expression 'MQ<40.0' --filter-name 'LOW_MQ' \\
+			--filter-expression 'MQRankSum<-12.5' --filter-name 'LOW_MQRS' \\
+			--filter-expression 'ReadPosRankSum<-8.0' --filter-name 'LOW_RPRS' \\
+			--filter-expression 'SOR>3.0' --filter-name 'HIGH_SOR' 
+			"""
+			# --filter-expression "QD < 2.0 || FS > 60.0 || MQ < 40.0 || MQRankSum < -12.5 || ReadPosRankSum < -8.0" \\
 
 ### Variant Quality Score Recalibration (VQSR)? ###
+
+rule perl_filter:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz"
+	shell:
+		r"""perl -ne 'chomp;if($_=~/^#/ || $_ =~ /PASS/){{print "$_\n"}}'""" + f" {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz" + ">" + f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz"
+
+rule FilterVar:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.annovar"
+	shell:
+		f"""perl ./FilterVar.pl \\
+		-in {config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz \\
+		-out {config['output_dir']}/variants/{config['sample_name']}.snp.annovar \\
+		-minhet 0.20 --wildsample -qual 30 -dp 20 -adp 10 -gq 30 --rough"""
+	
+# filter indel
+rule selectvariants_indel:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.vcf.gz",
+		f"{config['reference_panel_path']}"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz"
+	shell:
+		f"""{gatk} SelectVariants \\
+			-R {config['reference_panel_path']} \\
+			-V {config['output_dir']}/variants/{config['sample_name']}.vcf.gz \\
+			-select-type-to-include INDEL \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz"""
+
+rule VariantFiltration_indel:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz",
+		f"{config['reference_panel_path']}"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz"
+	shell:
+		f"""{gatk} VariantFiltration \\
+			-R {config['reference_panel_path']} \\
+			-V {config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz \\
+			--filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
+			--filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
+			--filter-expression 'FS>200.0' --filter-name 'HIGH_FS' \\
+			--filter-expression 'ReadPosRankSum<-20.0' --filter-name 'LOW_RPRS' \\
+			--filter-expression 'SOR>10.0' --filter-name 'HIGH_SOR' 
+			"""
+
+rule perl_filter_indel:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz"
+	shell:
+		r"""perl -ne 'chomp;if($_=~/^#/ || $_ =~ /PASS/){{print "$_\n"}}'""" + f" {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz" + ">" + f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz"
+
+rule FilterVar_indel:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.annovar"
+	shell:
+		f"""perl ./FilterVar.pl \\
+		-in {config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz \\
+		-out {config['output_dir']}/variants/{config['sample_name']}.indel.annovar \\
+		-minhet 0.30 --wildsample -qual 30 -dp 20 -adp 10 -gq 30 --rough"""
+
+rule CombineVariants:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.annovar",
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.annovar"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.annovar"
+	shell:
+		f"""cat {config['output_dir']}/variants/{config['sample_name']}.snp.annovar {config['output_dir']}/variants/{config['sample_name']}.indel.annovar > {config['output_dir']}/variants/{config['sample_name']}.annovar"""
+
+rule ExtremeVar:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.annovar",
+		f"{config['ExtremeVar_PATH']}"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.extreme.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.hg38_multianno.txt"
+	shell:
+		# "$ExtremeVar -in $dir[2]/$id2name{$i}.annovar -out $id2name{$i}.initial -Psoft $opt{Psoft} -maf $opt{MAFS} -reference $opt{ref} --extreme --extreme_all --remove -database $db_path  $db\n",
+		f"""perl {config['ExtremeVar_PATH']} \\
+		-in {config['output_dir']}/variants/{config['sample_name']}.annovar \\
+		-out {config['output_dir']}/variants/{config['sample_name']}.initial \\
+		-Psoft {config['Psoft']} \\
+		-maf {config['MAFS']} \\
+		-reference {config['reference_panel_name']} \\
+		--extreme \\
+		--extreme_all \\
+		--remove \\
+		-database {config['database_path']}  {db}
+		"""
+
+#"$ExtremeVar2 -out $id2name{$i}.initial --extreme --extreme_all -MPsoft $opt{MPsoft2} -reference $opt{ref}"
+rule ExtremeVar2:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.extreme.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.hg38_multianno.txt",
+		f"{config['ExtremeVar2_PATH']}"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls"
+	shell:
+		f"""perl {config['ExtremeVar2_PATH']} \\
+		-out {config['output_dir']}/variants/{config['sample_name']}.initial \\
+		--extreme \\
+		--extreme_all \\
+		-MPsoft {config['MPsoft2']} \\
+		-reference {config['reference_panel_name']}
+		"""
+
+rule awk_select:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.xls"
+	shell:
+		r"""awk -F \"\\t\" 'BEGIN{{IGNORECASE=1}} NR==1 {{print $0}} NR>1 {{if($1~/Y/ || $105~/pathogenic/ || $105~/drug_response/ || ($107~/DM/ && $105 !~/benign/)) print $0}}' """+f"""{config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls"""+" | cut -f 1-10,12-26,30-33,37,41,45,51-53,55-60,64,69,79,85,88,93-94,97,100-111,115 > "+f"{config['output_dir']}/variants/{config['sample_name']}.initial.xls"
+
+rule progress:
+	input:
+		f"{config['output_dir']}/variants/{config['sample_name']}.initial.xls",
+		f"{config['progress_PATH']}", # perl script
+		f"{config['TRANSCRIPT']}",
+		f"{config['GENEMODEL']}",
+		f"{config['HPO']}"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.extreme.xls"
+	shell:
+	# $process $id2name{$i}.initial.xls $transcript $gm $hpo > $id2name{$i}.extreme.xls
+		f"perl {config['progress_PATH']} {config['output_dir']}/variants/{config['sample_name']}.initial.xls {config['TRANSCRIPT']} {config['GENEMODEL']} {config['HPO']}>{config['output_dir']}/variants/{config['sample_name']}.extreme.xls"
+
+rule ACMG:
+	input:
+		f"{config['ACMG_perl_script_PATH']}",
+		f"{config['output_dir']}/variants/{config['sample_name']}.extreme.xls"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.prefinal.xls"
+	shell:
+		f"perl {config['ACMG_perl_script_PATH']} -in {config['output_dir']}/variants/{config['sample_name']}.extreme.xls -out {config['output_dir']}/variants/{config['sample_name']}.prefinal.xls"
+
+rule getVar2:
+	input:
+		f"{config['getVar2_script_PATH']}",
+		f"{config['output_dir']}/variants/{config['sample_name']}.prefinal.xls"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.loose.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.strict.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.final.xls"
+	shell:
+		f"""if [{getVar2_flag}]
+		then
+			{config['getVar2_script_PATH']} -in {config['output_dir']}/variants/{config['sample_name']}.prefinal.xls -list {config['panel_PATH']} -acmglist {config['acmg78']} -o1 {config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls -o2 {config['output_dir']}/variants/{config['sample_name']}.loose.xls -o3 {config['output_dir']}/variants/{config['sample_name']}.strict.xls -o4 {config['output_dir']}/variants/{config['sample_name']}.final.xls
+		else
+			perl {config['getVar2_script_PATH']} -in {config['output_dir']}/variants/{config['sample_name']}.prefinal.xls -acmglist {config['acmg78']} -o1 {config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls -o2 {config['output_dir']}/variants/{config['sample_name']}.loose.xls -o3 {config['output_dir']}/variants/{config['sample_name']}.strict.xls -o4 {config['output_dir']}/variants/{config['sample_name']}.final.xls
+		fi"""
+
+# 删除中间文件
+# rule clean:
+# 	input:
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.prefinal.xls",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.extreme.xls",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.xls",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.extreme.xls",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.hg38_multianno.txt",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.annovar",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.annovar",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz",
+# 		f"{config['output_dir']}/variants/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table",
+# 	shell:
+# 		f"""rm {config['output_dir']}/variants/{config['sample_name']}.prefinal.xls {config['output_dir']}/variants/{config['sample_name']}.extreme.xls {config['output_dir']}/variants/{config['sample_name']}.initial.xls {config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls {config['output_dir']}/variants/{config['sample_name']}.initial.extreme.xls {config['output_dir']}/variants/{config['sample_name']}.initial.hg38_multianno.txt {config['output_dir']}/variants/{config['sample_name']}.snp.annovar {config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.indel.annovar {config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"""
+
+
+# rule get_result:
+# input:
+# 	f"{config['get_result_perl_script_PATH']}",
+# 	f"{config['output_dir']}/variants/{config['sample_name']}.strict.xls",
+# 	f"{config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls"
+# output:
+
+# shell:
+# 	f"perl {config['get_result_perl_script_PATH']} {config['output_dir']}/variants/{config['sample_name']}.strict.xls {config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls "
