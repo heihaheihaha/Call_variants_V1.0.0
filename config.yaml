@@ -14,3 +14,33 @@ lane: "unit1"
 platform: "Illumina"
 
 output_dir: "/data/wangty/lyp_trio/result"
+
+reference_panel_name: "hg38"
+
+ExtremeVar2_PATH: "/data/wangty/WES_pipeline_V2.2/lib/ExtremeVar2.pl"
+ExtremeVar_PATH: "/data/wangty/WES_pipeline_V2.2/lib/ExtremeVar.pl"
+
+Psoft: "ReVe,gt,0.7:VEST3,gt,0.6:REVEL,gt,0.4:CADD,gt,20:GERP++,gt,2"
+MPsoft: 0.6
+MPsoft2: 0.1
+MAFS: "gnomAD_exome_ALL,0.001:gnomad312_AF,0.001:gnomAD_exome_EAS,0.001:gnomad312_AF_eas,0.001:ExAC_EAS,0.001:ExAC_ALL,0.001:esp6500siv2_all,0.001:1000g2015aug_eas,0.001:1000g2015aug_all,0.001"
+
+database_path: "/data/wangty/WES_pipeline_V2.2/database/hg38/annovar"
+
+progress_PATH: "/data/wangty/WES_pipeline_V2.2/lib/process.pl"
+
+ACMG_perl_script_PATH: "/data/wangty/WES_pipeline_V2.2/lib/ACMG.pl"
+
+getVar2_script_PATH: "/data/wangty/WES_pipeline_V2.2/lib/getVar2.pl"
+
+get_result_perl_script_PATH: "/data/wangty/WES_pipeline_V2.2/lib/get_result.pl"
+
+category: "genebased-hgmd-gene4denovo"
+
+panel_type: "ASD"
+
+HPO: "/data/wangty/WES_pipeline_V2.2/database/HPO/HPO_database.txt"
+GENEMODEL: "/data/wangty/WES_pipeline_V2.2/database/OMIM.20210712/gm.txt"
+TRANSCRIPT: "/data/wangty/WES_pipeline_V2.2/lib/canonical_transcript.txt"
+panel_PATH: "/data/wangty/WES_pipeline_V2.2/lib/gene_list/all.gene.txt"
+acmg78: "/data/wangty/WES_pipeline_V2.2/lib/ACMG78.list"
