@@ -1,19 +1,19 @@
 gatk_path: "/data/wangty/my_bin/gatk-4.4.0.0/gatk"
 
-R1_path: "/data/wangty/lyp_trio/ylp/21Y13924MU0.R1.clean.fastq.gz"
-R2_path: "/data/wangty/lyp_trio/ylp/21Y13924MU0.R2.clean.fastq.gz"
+R1_path: "/data/wangty/WES_pipeline_V2.2/example/2212B001/01.Cleandata/2212B001.R1.fq.gz"
+R2_path: "/data/wangty/WES_pipeline_V2.2/example/2212B001/01.Cleandata/2212B001.R2.fq.gz"
 
 reference_panel_path: "/data/wangty/my_ref/hg38.fa"
 
-sample_name: "MU0"
+sample_name: "WES_example"
 
 known_sites: "/data/wangty/my_ref/dbsnp_138.hg38.vcf.gz"
 
-lane: "unit1"
+lane: "unit2"
 
 platform: "Illumina"
 
-output_dir: "/data/wangty/lyp_trio/result"
+output_dir: "/data/wangty/test_diff_temp"
 
 reference_panel_name: "hg38"
 

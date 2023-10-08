@@ -26,7 +26,7 @@ rule end:
 	input:
 		f"{config['output_dir']}/variants/{config['sample_name']}.annovar", # trigger the rule HaplotypeCaller, may change later
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table.pdf", # trigger the rule AnalyzeCovariates
-		f"{config['output_dir']}/variants/{config['sample_name']}.strict.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.stat.xlsx",
 		f"{ref_dict_path}" # trigger the rule dict_index
 
 # Prepare environment
@@ -458,28 +458,23 @@ rule getVar2:
 			perl {config['getVar2_script_PATH']} -in {config['output_dir']}/variants/{config['sample_name']}.prefinal.xls -acmglist {config['acmg78']} -o1 {config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls -o2 {config['output_dir']}/variants/{config['sample_name']}.loose.xls -o3 {config['output_dir']}/variants/{config['sample_name']}.strict.xls -o4 {config['output_dir']}/variants/{config['sample_name']}.final.xls
 		fi"""
 
-# 删除中间文件
-# rule clean:
-# 	input:
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.prefinal.xls",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.extreme.xls",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.xls",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.extreme.xls",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.initial.hg38_multianno.txt",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.annovar",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.annovar",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz",
-# 		f"{config['output_dir']}/variants/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table",
-# 	shell:
-# 		f"""rm {config['output_dir']}/variants/{config['sample_name']}.prefinal.xls {config['output_dir']}/variants/{config['sample_name']}.extreme.xls {config['output_dir']}/variants/{config['sample_name']}.initial.xls {config['output_dir']}/variants/{config['sample_name']}.initial.tmp.xls {config['output_dir']}/variants/{config['sample_name']}.initial.extreme.xls {config['output_dir']}/variants/{config['sample_name']}.initial.hg38_multianno.txt {config['output_dir']}/variants/{config['sample_name']}.snp.annovar {config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.indel.annovar {config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz {config['output_dir']}/variants/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"""
+rule get_result:
+	input:
+		f"{config['get_result_perl_script_PATH']}",
+		f"{config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.loose.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.strict.xls",
+		f"{config['output_dir']}/variants/{config['sample_name']}.final.xls"
+	output:
+		f"{config['output_dir']}/variants/{config['sample_name']}.stat.xls"
+	shell:
+		f"""perl {config['get_result_perl_script_PATH']} \\
+		{config['output_dir']}/variants/{config['sample_name']}.strict.xls \\
+		{config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls \\
+		{config['output_dir']}/variants/{config['sample_name']}.loose.xls \\
+		{config['output_dir']}/variants/{config['sample_name']}.final.xls \\
+		{config['output_dir']}/variants/{config['sample_name']}.stat.xls"""
+
 
 
 # rule get_result:
