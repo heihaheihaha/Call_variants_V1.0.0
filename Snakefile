@@ -175,7 +175,7 @@ rule BaseRecalibrator:
 	output: 
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"
 	shell:
-		f"""{gatk} BaseRecalibratorSpark \\
+		f"""{gatk} BaseRecalibrator \\
 			-R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
 			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table \\
@@ -187,7 +187,7 @@ rule ApplyBQSR:
 	output:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam"
 	shell:
-		f"""{gatk} ApplyBQSRSpark -R {config['reference_panel_path']} \\
+		f"""{gatk} ApplyBQSR -R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
 			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
 			--bqsr-recal-file {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"""
@@ -212,7 +212,7 @@ rule BaseRecalibrator2:
 	output:
 		f"{config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table"
 	shell:
-		f"""{gatk} BaseRecalibratorSpark \\
+		f"""{gatk} BaseRecalibrator \\
 			-R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
 			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam.table \\
@@ -240,7 +240,7 @@ rule HaplotypeCaller:
 	output:
 		f"{config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz"
 	shell:
-		f"""{gatk} HaplotypeCallerSpark \\
+		f"""{gatk} HaplotypeCaller \\
 			-R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
 			-O {config['output_dir']}/variants/{config['sample_name']}.g.vcf.gz \\
@@ -276,12 +276,12 @@ rule VariantFiltration:
 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz",
 		f"{config['reference_panel_path']}"
 	output:
-		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf"
 	shell:
 		f"""{gatk} VariantFiltration \\
 			-R {config['reference_panel_path']} \\
 			-V {config['output_dir']}/variants/{config['sample_name']}.snp.vcf.gz \\
-			-O {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf \\
 			--filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
 			--filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
 			--filter-expression 'FS>60.0' --filter-name 'HIGH_FS' \\
@@ -296,20 +296,20 @@ rule VariantFiltration:
 
 rule perl_filter:
 	input:
-		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf"
 	output:
-		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf"
 	shell:
-		r"""perl -ne 'chomp;if($_=~/^#/ || $_ =~ /PASS/){{print "$_\n"}}'""" + f" {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf.gz" + ">" + f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz"
+		r"""perl -ne 'chomp;if($_=~/^#/ || $_ =~ /PASS/){{print "$_\n"}}'""" + f" {config['output_dir']}/variants/{config['sample_name']}.snp.passed.vcf" + ">" + f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf"
 
-rule FilterVar:
+rule FilterVar_SNP:
 	input:
-		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf"
 	output:
 		f"{config['output_dir']}/variants/{config['sample_name']}.snp.annovar"
 	shell:
 		f"""perl ./FilterVar.pl \\
-		-in {config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf.gz \\
+		-in {config['output_dir']}/variants/{config['sample_name']}.snp.filtered.vcf \\
 		-out {config['output_dir']}/variants/{config['sample_name']}.snp.annovar \\
 		-minhet 0.20 --wildsample -qual 30 -dp 20 -adp 10 -gq 30 --rough"""
 	
@@ -332,12 +332,12 @@ rule VariantFiltration_indel:
 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz",
 		f"{config['reference_panel_path']}"
 	output:
-		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf"
 	shell:
 		f"""{gatk} VariantFiltration \\
 			-R {config['reference_panel_path']} \\
 			-V {config['output_dir']}/variants/{config['sample_name']}.indel.vcf.gz \\
-			-O {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz \\
+			-O {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf \\
 			--filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
 			--filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
 			--filter-expression 'FS>200.0' --filter-name 'HIGH_FS' \\
@@ -347,20 +347,20 @@ rule VariantFiltration_indel:
 
 rule perl_filter_indel:
 	input:
-		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf"
 	output:
-		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf"
 	shell:
-		r"""perl -ne 'chomp;if($_=~/^#/ || $_ =~ /PASS/){{print "$_\n"}}'""" + f" {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf.gz" + ">" + f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz"
+		r"""perl -ne 'chomp;if($_=~/^#/ || $_ =~ /PASS/){{print "$_\n"}}'""" + f" {config['output_dir']}/variants/{config['sample_name']}.indel.passed.vcf" + ">" + f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf"
 
 rule FilterVar_indel:
 	input:
-		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz"
+		f"{config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf"
 	output:
 		f"{config['output_dir']}/variants/{config['sample_name']}.indel.annovar"
 	shell:
 		f"""perl ./FilterVar.pl \\
-		-in {config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf.gz \\
+		-in {config['output_dir']}/variants/{config['sample_name']}.indel.filtered.vcf \\
 		-out {config['output_dir']}/variants/{config['sample_name']}.indel.annovar \\
 		-minhet 0.30 --wildsample -qual 30 -dp 20 -adp 10 -gq 30 --rough"""
 
@@ -466,14 +466,14 @@ rule get_result:
 		f"{config['output_dir']}/variants/{config['sample_name']}.strict.xls",
 		f"{config['output_dir']}/variants/{config['sample_name']}.final.xls"
 	output:
-		f"{config['output_dir']}/variants/{config['sample_name']}.stat.xls"
+		f"{config['output_dir']}/variants/{config['sample_name']}.stat.xlsx"
 	shell:
 		f"""perl {config['get_result_perl_script_PATH']} \\
 		{config['output_dir']}/variants/{config['sample_name']}.strict.xls \\
 		{config['output_dir']}/variants/{config['sample_name']}.clinvar_HGMD.xls \\
 		{config['output_dir']}/variants/{config['sample_name']}.loose.xls \\
 		{config['output_dir']}/variants/{config['sample_name']}.final.xls \\
-		{config['output_dir']}/variants/{config['sample_name']}.stat.xls"""
+		{config['output_dir']}/variants/{config['sample_name']}.stat.xlsx"""
 
 
 
