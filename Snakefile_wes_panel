@@ -1,0 +1,549 @@
+# The snakemake workfollow of WES.Panel (JXH)
+
+import os 
+import json
+from os.path import join
+
+# loard config file
+configfile:'config.yml'
+
+# The software directory  soft linked with other directory
+BIN=config['software_scripts_path']
+
+# Data base directory, some requried files(soft linked)
+DATABASE=config['data_base_path']
+
+# The reference genome,the abs path of reference genome
+ref_genome=config['reference_panel_path']
+
+# reference genome index
+index_bk=['bwt','pac','ann','sa','amb']
+
+# the result output directoray 
+OUT_DIR=config['outdir']
+
+# bam stats
+BAMST=config['bamst']
+
+# bam statis list
+file_list=['chromosomes.report','coverage.report','depth_distribution.plot','depth.tsv.gz','insertsize.plot','region.tsv.gz','uncover.bed']
+# rule getvar2 
+db=""
+for i in config["category"].split("-"):
+    db += f"-{i} Y "
+
+if ('ASD' in {config['panel_type']}):
+        getVar2_flag = 1
+else:
+        getVar2_flag = 0
+
+# panel or WES
+if config['panel']:
+	# The panel gene bed file
+	GENE_BED = config['panel_gene']
+else:
+	# The all whole exome P file
+	GENE_BED = DATABASE+'/Human_Exome_Panel-hg38.bed'
+
+# loard the sample information (sample_name,path of squence data)
+# the sample information is saved by json format
+sample_json = config['sample_json']
+FILES = json.load(open(sample_json))
+
+# sample name
+SAMPLES=sorted(FILES.keys()) # sample_list container
+print(SAMPLES)
+
+# the suffix of sequence data 
+ENDs=['R1','R2']
+
+
+# return the fastq information
+# using wildcards in Snakemake
+def get_fq(wildcards): 
+    return FILES[wildcards.sample][wildcards.end]
+
+	
+rule all:
+	input:
+		[OUT_DIR+'/03.FastaQC/'+x for x in expand("{sample}.clean.{type}_fastqc.{bk}",sample=SAMPLES,bk=['zip','html'],type=ENDs)], # FASTAQC result
+
+		expand("{outdir}/01.Input_data/{sample}.{end}.fq.gz",outdir=OUT_DIR,sample=SAMPLES,end=ENDs), # The soft linked fastq
+		expand("{outdir}/02.Clean/{sample_d}.clean.R1.fq.gz",outdir=OUT_DIR,sample_d=SAMPLES), # The fastp result
+		expand("{outdir}/02.Clean/{sample_d}.clean.R2.fq.gz",outdir=OUT_DIR,sample_d=SAMPLES),
+		expand("{ref_genome}.{index_bk}",ref_genome=ref_genome,index_bk=index_bk), # The suffix of bwa index result
+		expand("{outdir}/04.Mapping/{sample_d}.sorted.bam.rg2.table",outdir=OUT_DIR,sample_d=SAMPLES), # BQSR rctable result
+#		expand("{outdir}/04.Bamsts/{sample_d}/{file}",outdir=OUT_DIR,sample_d=SAMPLES,file=file_list), # bam statis
+		expand("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam",outdir=OUT_DIR,sample_d=SAMPLES), # BQSR bam result
+		expand("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam.bai",outdir=OUT_DIR,sample_d=SAMPLES),
+		expand("{outdir}/06.Annotation/{sample_d}.stat.xls",outdir=OUT_DIR,sample_d=SAMPLES), # The final resulta
+		expand("{outdir}/07.Results/{sample_d}.result.xls",outdir=OUT_DIR,sample_d=SAMPLES),#
+#		expand("{outdir}/Base_Recall/{sample}.sorted.bam.rg2.table.pdf",outdir=OUT_DIR,sample=SAMPLES),
+		ref_genome+'.dict' # The gatk index result, ex: xxx.fa.dict
+
+# soft link raw squencing data from the raw data path and rename to the xxx.fq.gz format
+rule re_fq_name:
+	input:
+		get_fq
+	output:
+		OUT_DIR+"/01.Input_data/{sample}.{end}.fq.gz"
+	shell:
+		"ln -s {input} {output}"
+
+# generate the clean data
+rule fastp:
+	input:
+                R1 = lambda wildcards: FILES[wildcards.sample]['R1'],
+                R2 = lambda wildcards: FILES[wildcards.sample]['R2']
+	output:
+		clean_R1 = "{outdir}/02.Clean/{sample_d}.clean.R1.fq.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+		clean_R2 = "{outdir}/02.Clean/{sample_d}.clean.R2.fq.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+		json = "{outdir}/02.Clean/{sample_d}.fastp.json".format(outdir=OUT_DIR,sample_d='{sample}'),
+		html = "{outdir}/02.Clean/{sample_d}.fastp.html".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/fastp_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"fastp -i {input.R1} -I {input.R2} -o {output.clean_R1} -O {output.clean_R2} -q 20 -l 40 -j {output.json} -h {output.html}"
+
+
+rule fastp_sta:
+	input:
+		json = rules.fastp.output[2]
+	output:
+		"{outdir}/02.Clean/{sample_d}_QCstat.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/fastp_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/QCstat.pl {SAMPLES} {input} > {output}"
+
+
+#  index the reference genome
+rule index_reference:
+	input:
+		ref_genome
+	output:
+		expand("{ref_genome}.{index_bk}",ref_genome=ref_genome,index_bk=index_bk),
+		"{ref_genome}.fai".format(ref_genome=ref_genome)
+	conda:
+		"{outdir}/conda_yml/bwa_samtools.yml".format(outdir=OUT_DIR)
+	log:
+		"{outdir}/log/bwa_index.log".format(outdir=OUT_DIR)
+	shell:
+		"""
+		bwa index {input} 2>{log}
+		samtools faidx {input}	
+		"""
+
+
+# gatk dict for reference genome
+rule gatk_dict_reference:
+	input:
+		ref_genome
+	output:
+		ref_genome+'.dict'
+	log:
+		"{outdir}/log/gatk_dict_reference.log".format(outdir=OUT_DIR)
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk CreateSequenceDictionary REFERENCE={input} OUTPUT={output}  2>{log}"
+		
+		
+# Quality check for the sequencing data
+rule fastqc:
+	input:
+		expand(OUT_DIR+"/02.Clean/{sample}.clean.{type}.fq.gz",sample=SAMPLES,type=ENDs)
+	output:
+		expand(OUT_DIR+"/03.FastaQC/{sample}.clean.{type}_fastqc.{bk}",sample=SAMPLES,type=ENDs,bk=['html','zip'])
+	log:
+		"{outdir}/log/fastqc.log".format(outdir=OUT_DIR)
+	conda:
+		"{outdir}/conda_yml/fastqc.yml".format(outdir=OUT_DIR)
+	threads: 10
+	shell:
+		"fastqc {input} -t {threads} -o "+ OUT_DIR +"/03.FastaQC 2>{log}"
+
+# Maping PE reads to reference genome
+rule bwa_map:
+	input:
+		ref = ref_genome,
+		R1 = rules.fastp.output[0],
+		R2 = rules.fastp.output[1]
+	output:
+		temp("{outdir}/04.Mapping/{sample_d}.bam".format(outdir=OUT_DIR,sample_d='{sample}'))
+	params:
+		r"@RG\tID:{sample}\tPL:ILLUMINA\tSM:{sample}"
+	conda:
+		"{outdir}/conda_yml/bwa_samtools.yml".format(outdir=OUT_DIR)
+	log:
+		"{outdir}/log/bwa_map_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	threads: 16
+	shell:
+		"(bwa mem -t {threads} {input.ref} {input.R1} {input.R2} "
+		"-R '{params}' | samtools view -bS -> {output}) 2>{log}"
+
+# sorted the bam 
+rule bam_sort:
+	input:
+		rules.bwa_map.output
+	output:
+		temp("{outdir}/04.Mapping/{sample_d}.sorted.bam".format(outdir=OUT_DIR,sample_d='{sample}'))
+	log:
+		"{outdir}/log/bam_sort_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	conda:
+		"{outdir}/conda_yml/bwa_samtools.yml".format(outdir=OUT_DIR)
+	threads: 16
+	shell:
+		"(samtools sort -@ {threads} -T {wildcards.sample} -O bam {input} > {output}) 2>{log}"
+
+# bam index
+rule bam_index:
+	input:
+		rules.bam_sort.output
+	output:
+		temp("{outdir}/04.Mapping/{sample_d}.sorted.bam.bai".format(outdir=OUT_DIR,sample_d='{sample}')) 
+	log:
+		"{outdir}/log/bam_sort_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"samtools index {input} 2>{log}"
+
+# BaseRecalibrator
+rule BaseRecalibrator:
+	input:
+		ref = ref_genome,
+		sorted_bam = rules.bam_sort.output,
+		know_site1 = "{db}/dbsnp_138.hg38.vcf.gz".format(db=DATABASE),
+		know_site2 = "{db}/1000G_phase1.snps.high_confidence.hg38.vcf.gz".format(db=DATABASE)
+	output:
+		"{outdir}/04.Mapping/{sample_d}.sorted.bam.rg.table".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/Base_Recall_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk BaseRecalibrator -R {input.ref} -I {input.sorted_bam} -O {output} --known-sites {input.know_site1} --known-sites {input.know_site2} 2>{log}"
+
+
+# ApplyBQSR
+rule ApplyBQSR:
+	input:
+		ref = ref_genome,
+		sorted_bam = rules.bam_sort.output,
+		rc_table = rules.BaseRecalibrator.output
+	output:
+		protected("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam".format(outdir=OUT_DIR,sample_d='{sample}'))
+	log:
+		"{outdir}/log/BQSR_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk ApplyBQSR -R {input.ref} -I {input.sorted_bam} -O {output} --bqsr-recal-file {input.rc_table} 2>{log}"
+
+# BQSR bam index by using samtools
+
+rule bqsr_bam_index:
+	input:
+		rules.ApplyBQSR.output
+	output:
+		protected("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam.bai".format(outdir=OUT_DIR,sample_d='{sample}'))
+	log:
+		"{outdir}/log/BQSR_bam_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"samtools index {input} 2>{log}"
+
+
+# bam statistc
+
+
+rule bam_statis:
+	input:
+		rules.ApplyBQSR.output
+	output:
+		"{outdir}/04.Bamsts/{sample_d}/chromosomes.report".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/04.Bamsts/{sample_d}/coverage.report".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/04.Bamsts/{sample_d}/depth_distribution.plot".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/04.Bamsts/{sample_d}/depth.tsv.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/04.Bamsts/{sample_d}/insertsize.plot".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/04.Bamsts/{sample_d}/region.tsv.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/04.Bamsts/{sample_d}/uncover.bed".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/bamstat_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BAMST} -p {GENE_BED} -O {output}"
+
+# BaseRecalibrator 2 
+rule BaseRecalibrator2:
+	input:
+		ref = ref_genome,
+		BQSR = rules.ApplyBQSR.output,
+		know_site1 = "{db}/dbsnp_138.hg38.vcf.gz".format(db=DATABASE),
+		know_site2 = "{db}/1000G_phase1.snps.high_confidence.hg38.vcf.gz".format(db=DATABASE)
+	output:
+		protected("{outdir}/04.Mapping/{sample_d}.sorted.bam.rg2.table".format(outdir=OUT_DIR,sample_d='{sample}'))
+	log:
+		"{outdir}/log/Base_Recall2_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk BaseRecalibrator -R {input.ref} -I {input.BQSR} -O {output} --known-sites {input.know_site1} --known-sites {input.know_site2} 2>{log}"
+
+# AnalyzeCovariates
+rule AnalyzeCovariates:
+	input:
+		before = rules.BaseRecalibrator.output,
+		after = rules.BaseRecalibrator2.output
+	output:
+		"{outdir}/04.Mapping/{sample_d}.sorted.bam.rg2.table.pdf".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/AnalyzeCovariates_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	conda:
+		"{outdir}/conda_yam/gatk_R_plot.yml".format(outdir=OUT_DIR)
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk AnalyzeCovariates -before {input.before} -after {input.after} -plots {output} 2>{log}"
+
+# HaplotypeCaller
+rule HaplotypeCaller:
+	input:
+		ref = ref_genome,
+		bqsr_result = rules.ApplyBQSR.output
+	output:
+		"{outdir}/05.Variants/{sample_d}.g.vcf.gz".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/HaplotypeCaller_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk HaplotypeCaller -R {input.ref} -I {input.bqsr_result} -O {output} -ERC GVCF -D {DATABASE}/dbsnp_138.hg38.vcf.gz -L {GENE_BED} -ip 50 2>{log}"
+
+# GenotypeGVCFs
+rule GenotypeGVCFs:
+	input:
+		ref = ref_genome,
+		gvcf = rules.HaplotypeCaller.output
+	output:
+		"{outdir}/05.Variants/{sample_d}.vcf.gz".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/GenotypeGVCFs_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/gatk-4.4.0.0/gatk GenotypeGVCFs -R {input.ref} -V {input.gvcf} -O {output} 2>{log}"
+
+# selectvariants_snp_INDEL
+rule selectvariants_snp_INDEL:
+	input:
+		ref = ref_genome,
+		vcf = rules.GenotypeGVCFs.output
+	output:
+		"{outdir}/05.Variants/{sample_d}.SNP.vcf.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/05.Variants/{sample_d}.INDEL.vcf.gz".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/selectvariants_SNP_{sample}.log".format(outdir=OUT_DIR,sample='{sample}'),
+		"{outdir}/log/selectvariants_INDEL_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"""
+		{BIN}/gatk-4.4.0.0/gatk SelectVariants -R {input.ref} -V {input.vcf} -O {output[0]} -select-type-to-include SNP 2>{log[0]}
+		{BIN}/gatk-4.4.0.0/gatk SelectVariants -R {input.ref} -V {input.vcf} -O {output[1]} -select-type-to-include INDEL 2>{log[1]}
+		"""
+
+# VariantFiltration 
+rule VariantFiltration:
+	input:
+		ref = ref_genome,
+		snp_vcf = rules.selectvariants_snp_INDEL.output[0],
+		indel_vcf = rules.selectvariants_snp_INDEL.output[1]
+	output:
+		"{outdir}/05.Variants/{sample_d}.SNP.passed.vcf".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/05.Variants/{sample_d}.INDEL.passed.vcf".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/VariantFiltration_SNP_{sample}.log".format(outdir=OUT_DIR,sample='{sample}'),
+		"{outdir}/log/VariantFiltration_INDEL_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"""
+			{BIN}/gatk-4.4.0.0/gatk VariantFiltration \\
+			-R {input.ref} \\
+			-V {input.snp_vcf} \\
+			-O {output[0]} \\
+			--filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
+			--filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
+			--filter-expression 'FS>60.0' --filter-name 'HIGH_FS' \\
+			--filter-expression 'MQ<40.0' --filter-name 'LOW_MQ' \\
+			--filter-expression 'MQRankSum<-12.5' --filter-name 'LOW_MQRS' \\
+			--filter-expression 'ReadPosRankSum<-8.0' --filter-name 'LOW_RPRS' \\
+			--filter-expression 'SOR>3.0' --filter-name 'HIGH_SOR' 2>{log[0]}
+			{BIN}/gatk-4.4.0.0/gatk VariantFiltration \\
+			-R {input.ref} \\
+			-V {input.indel_vcf} \\
+			-O {output[1]} \\
+			--filter-expression 'QUAL<30.0' --filter-name 'LOW_QUAL' \\
+			--filter-expression 'QD<2.0' --filter-name 'LOW_QD' \\
+			--filter-expression 'FS>200.0' --filter-name 'HIGH_FS' \\
+			--filter-expression 'ReadPosRankSum<-20.0' --filter-name 'LOW_RPRS' \\
+			--filter-expression 'SOR>10.0' --filter-name 'HIGH_SOR' 2>{log[1]}
+		"""
+
+# perl filter
+
+rule perl_filter:
+	input:
+		snp_pass_vcf = rules.VariantFiltration.output[0],
+		indel_pass_vcf = rules.VariantFiltration.output[1]
+	output:
+		"{outdir}/05.Variants/{sample_d}.SNP.filtered.vcf".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/05.Variants/{sample_d}.INDEL.filtered.vcf".format(outdir=OUT_DIR,sample_d='{sample}')
+	params:
+		r''' 'chomp;if($_=~/^#/ || $_ =~ /PASS/){print "$_\n"}' '''
+	log:
+		"{outdir}/log/perl_filter_SNP_{sample}.log".format(outdir=OUT_DIR,sample='{sample}'),
+		"{outdir}/log/perl_filter_INDEL_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+
+	shell:
+		"""
+		perl -ne {params} {input.snp_pass_vcf} > {output[0]} 2>{log[0]} 
+		perl -ne {params} {input.indel_pass_vcf} > {output[1]} 2>{log[1]}
+		"""
+	
+
+rule filter_var:
+	input:
+		snp_filter_vcf = rules.perl_filter.output[0],
+		indel_filter_vcf = rules.perl_filter.output[1]
+	output:
+		"{outdir}/05.Variants/{sample_d}.SNP.annovar".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/05.Variants/{sample_d}.INDEL.annovar".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/filter_var_SNP_{sample}.log".format(outdir=OUT_DIR,sample='{sample}'),
+		"{outdir}/log/filter_var_INDEL_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"""
+			perl {BIN}/FilterVar.pl -in {input.snp_filter_vcf} -out {output[0]} -minhet 0.20 --wildsample -qual 30 -dp 20 -adp 10 -gq 30 --rough 2>{log[0]}
+			perl {BIN}/FilterVar.pl -in {input.indel_filter_vcf} -out {output[1]} -minhet 0.30 --wildsample -qual 30 -dp 20 -adp 10 -gq 30 --rough 2>{log[1]}
+		"""
+
+# combine snp and indel information
+rule CombineVariants:
+	input:
+		snp_annovar = rules.filter_var.output[0],
+		indel_annovar = rules.filter_var.output[1]
+	output:
+		"{outdir}/05.Variants/{sample_d}.annovar".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/CombineVariants_SNP_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"cat {input.snp_annovar} {input.indel_annovar} > {output} 2>{log}"
+
+
+# The basic arguments of ExtremeVar
+# ExtremeVar
+# # {DATABASE}/annnovar biggest database for annotation
+rule ExtremeVar:
+	input:
+		rules.CombineVariants.output
+	output:
+		"{outdir}/06.Annotation/{sample_d}.initial.extreme.xls".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/06.Annotation/{sample_d}.initial.hg38_multianno.txt".format(outdir=OUT_DIR,sample_d='{sample}'),
+		temp("{outdir}/06.Annotation/{sample_d}.initial.tmp.xls".format(outdir=OUT_DIR,sample_d='{sample}'))
+	params:
+		Psoft = config['Psoft'],
+		MAFs = config['MAFS'],
+		MPsoft = config['MPsoft2'],
+		Reference_panel_name = config['reference_panel_name'],
+		out_pre = '{outdir}/06.Annotation/{sample}.initial'.format(outdir=OUT_DIR,sample='{sample}')
+	log:
+		"{outdir}/log/extremevar_{sample}.log".format(outdir=OUT_DIR,sample='{sample}'),
+		"{outdir}/log/extremevar2_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"""
+			perl {BIN}/ExtremeVar.pl \\
+			-in {input} \\
+			-out {params.out_pre} \\
+			-Psoft {params.Psoft} \\
+			-maf {params.MAFs} \\
+			-reference {params.Reference_panel_name} \\
+			--extreme \\
+			--extreme_all \\
+			--remove \\
+			-database {DATABASE}/annovar  {db} 2>{log[0]} 
+
+			perl {BIN}/ExtremeVar2.pl \\
+			-out {params.out_pre} \\
+			--extreme \\
+			--extreme_all \\
+			-MPsoft {params.MPsoft} \\
+			-reference {params.Reference_panel_name} 2>{log[1]}
+		"""
+
+
+
+# select the useful information by awk
+rule awk_select:
+	input:
+		rules.ExtremeVar.output[2]
+	output:
+		"{outdir}/06.Annotation/{sample_d}.initial.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/awk_select_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	params:
+		awk_args = r" '\t' 'BEGIN{{IGNORECASE=1}} NR==1 {{print $0}} NR>1 {{if($1~/Y/ || $105~/pathogenic/ || $105~/drug_response/ || ($107~/DM/ && $105 !~/benign/)) print $0}}'",
+		cut_args = "1-10,12-26,30-33,37,41,45,51-53,55-60,64,69,79,85,88,93-94,97,100-111,115"
+	shell:
+		"awk -F {params.awk_args} {input} | cut -f {params.cut_args} > {output} 2>{log}"
+
+
+rule progress:
+	input:
+		awk_out = rules.awk_select.output
+	output:
+		"{outdir}/06.Annotation/{sample_d}.extreme.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/progress_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"perl {BIN}/process.pl {input.awk_out} {DATABASE}/canonical_transcript.txt {DATABASE}/gm.txt {DATABASE}/HPO_database.txt > {output} 2>{log}"
+        
+
+
+rule ACMG_prefinal:
+	input:
+		progress_out = rules.progress.output
+	
+	output:
+		"{outdir}/06.Annotation/{sample_d}.prefinal.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/ACMG_prefinal_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"perl {BIN}/ACMG.pl -in {input.progress_out} -out {output} 2>{log}"
+
+
+rule getVar2:
+	input:
+		prefinal_out = rules.ACMG_prefinal.output
+	output:
+		"{outdir}/06.Annotation/{sample_d}.clinvar_HGMD.xls".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/06.Annotation/{sample_d}.loose.xls".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/06.Annotation/{sample_d}.strict.xls".format(outdir=OUT_DIR,sample_d='{sample}'),
+		"{outdir}/06.Annotation/{sample_d}.final.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/get_var2_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"""
+		if {getVar2_flag};
+		then
+			perl {BIN}/getVar2.pl -in {input.prefinal_out} -list {DATABASE}/all.gene.txt -acmglist {DATABASE}/ACMG78.list -o1 {output[0]} -o2 {output[1]} -o3 {output[2]} -o4 {output[3]}
+		else
+			perl {BIN}/getVar2.pl -in {input.prefinal_out} -acmglist  {DATABASE}/ACMG78.list  -o1 {output[0]} -o2 {output[1]} -o3 {output[2]} -o4 {output[3]}
+		fi
+		"""
+
+# get the fastq stats and bam coverage stats
+rule get_stats:
+	input:
+		fp_result = rules.fastp_sta.output,
+		bamst_result = rules.bam_statis.output[1]
+	output:
+		"{outdir}/04.Bamsts/{sample_d}/basic_statis.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/get_stats_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"{BIN}/getstat.pl -i1 {input.fp_result}  -i2 {input.bamst_result} -n {SAMPLES} -o {output}"
+
+# output the final result
+rule get_result:
+	input:
+		getvar2_out = rules.getVar2.output,
+		get_stats_out = rules.get_stats.output
+	output:
+		"{outdir}/07.Results/{sample_d}.result.xls".format(outdir=OUT_DIR,sample_d='{sample}')
+	log:
+		"{outdir}/log/get_result_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
+	shell:
+		"perl {BIN}/get_result.pl {input.getvar2_out} {input.get_stats_out} {output}"
+
+
