@@ -1,0 +1,41 @@
+# config file
+#
+# # The requried files
+software_scripts_path: '/data/wangty/JXH_test_tmp/work_test/bin'
+data_base_path: '/data/wangty/JXH_test_tmp/work_test/data_base'
+#
+# # sample file
+sample_json: 'All_sample.json'
+#
+# reference genome path
+reference_panel_path: "/data/wangty/my_ref/hg38.fa"
+
+# work directory
+outdir: '/data/wangty/JXH_test_tmp/work_test'
+
+# genome name
+reference_panel_name: "hg38"
+
+# statistic of bam
+bamst: '/data/wangty/JXH_test_tmp/my_softeware/bamdst-master/bamdst'
+
+# basic argument for the snakemake
+
+# rule ExtremeVar
+Psoft: "ReVe,gt,0.7:VEST3,gt,0.6:REVEL,gt,0.4:CADD,gt,20:GERP++,gt,2"
+MPsoft: 0.6
+MAFS: "gnomAD_exome_ALL,0.001:gnomad312_AF,0.001:gnomAD_exome_EAS,0.001:gnomad312_AF_eas,0.001:ExAC_EAS,0.001:ExAC_ALL,0.001:esp6500siv2_all,0.001:1000g2015aug_eas,0.001:1000g2015aug_all,0.001"
+
+# rule ExtremeVar2
+MPsoft2: 0.1
+
+# genebase
+category: "genebased-hgmd-gene4denovo"
+
+# panel_type
+panel_type: "ASD"
+
+
+# juge
+panel: FALSE
+panel_gene: "gene.bed"
