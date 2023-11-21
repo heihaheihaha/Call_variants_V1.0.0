@@ -1,4 +1,4 @@
-# The snakemake workfollow of WES.Panel (JXH)
+# The snakemake workfollow of WES.Panel (JXH && WTY)
 
 import os 
 import json
@@ -33,9 +33,9 @@ for i in config["category"].split("-"):
     db += f"-{i} Y "
 
 if ('ASD' in {config['panel_type']}):
-        getVar2_flag = 1
+        getVar2_flag = 'True'
 else:
-        getVar2_flag = 0
+        getVar2_flag = 'False'
 
 # panel or WES
 if config['panel']:
@@ -73,10 +73,9 @@ rule all:
 		expand("{outdir}/02.Clean/{sample_d}.clean.R2.fq.gz",outdir=OUT_DIR,sample_d=SAMPLES),
 		expand("{ref_genome}.{index_bk}",ref_genome=ref_genome,index_bk=index_bk), # The suffix of bwa index result
 		expand("{outdir}/04.Mapping/{sample_d}.sorted.bam.rg2.table",outdir=OUT_DIR,sample_d=SAMPLES), # BQSR rctable result
-#		expand("{outdir}/04.Bamsts/{sample_d}/{file}",outdir=OUT_DIR,sample_d=SAMPLES,file=file_list), # bam statis
+		expand("{outdir}/04.Bamsts/{sample_d}/basic_statis.xls",outdir=OUT_DIR,sample_d=SAMPLES,file=file_list), # bam statis
 		expand("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam",outdir=OUT_DIR,sample_d=SAMPLES), # BQSR bam result
 		expand("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam.bai",outdir=OUT_DIR,sample_d=SAMPLES),
-		expand("{outdir}/06.Annotation/{sample_d}.stat.xls",outdir=OUT_DIR,sample_d=SAMPLES), # The final resulta
 		expand("{outdir}/07.Results/{sample_d}.result.xls",outdir=OUT_DIR,sample_d=SAMPLES),#
 #		expand("{outdir}/Base_Recall/{sample}.sorted.bam.rg2.table.pdf",outdir=OUT_DIR,sample=SAMPLES),
 		ref_genome+'.dict' # The gatk index result, ex: xxx.fa.dict
@@ -114,7 +113,7 @@ rule fastp_sta:
 	log:
 		"{outdir}/log/fastp_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
 	shell:
-		"{BIN}/QCstat.pl {SAMPLES} {input} > {output}"
+		"perl {BIN}/QCstat.pl {wildcards.sample} {input} > {output}"
 
 
 #  index the reference genome
@@ -144,7 +143,7 @@ rule gatk_dict_reference:
 	log:
 		"{outdir}/log/gatk_dict_reference.log".format(outdir=OUT_DIR)
 	shell:
-		"{BIN}/gatk-4.4.0.0/gatk CreateSequenceDictionary REFERENCE={input} OUTPUT={output}  2>{log}"
+		"{BIN}/gatk-4.4.0.0/gatk CreateSequenceDictionary -REFERENCE {input} -OUTPUT {output}  2>{log}"
 		
 		
 # Quality check for the sequencing data
@@ -250,20 +249,22 @@ rule bqsr_bam_index:
 
 
 rule bam_statis:
-	input:
-		rules.ApplyBQSR.output
-	output:
-		"{outdir}/04.Bamsts/{sample_d}/chromosomes.report".format(outdir=OUT_DIR,sample_d='{sample}'),
-		"{outdir}/04.Bamsts/{sample_d}/coverage.report".format(outdir=OUT_DIR,sample_d='{sample}'),
-		"{outdir}/04.Bamsts/{sample_d}/depth_distribution.plot".format(outdir=OUT_DIR,sample_d='{sample}'),
-		"{outdir}/04.Bamsts/{sample_d}/depth.tsv.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
-		"{outdir}/04.Bamsts/{sample_d}/insertsize.plot".format(outdir=OUT_DIR,sample_d='{sample}'),
-		"{outdir}/04.Bamsts/{sample_d}/region.tsv.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
-		"{outdir}/04.Bamsts/{sample_d}/uncover.bed".format(outdir=OUT_DIR,sample_d='{sample}')
-	log:
-		"{outdir}/log/bamstat_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
-	shell:
-		"{BAMST} -p {GENE_BED} -O {output}"
+        input:
+                rules.ApplyBQSR.output
+        params:
+                BAMST_outdir= "{outdir}/04.Bamsts/{sample_d}".format(outdir=OUT_DIR,sample_d='{sample}')
+        output:
+                "{outdir}/04.Bamsts/{sample_d}/chromosomes.report".format(outdir=OUT_DIR,sample_d='{sample}'),
+                "{outdir}/04.Bamsts/{sample_d}/coverage.report".format(outdir=OUT_DIR,sample_d='{sample}'),
+                "{outdir}/04.Bamsts/{sample_d}/depth_distribution.plot".format(outdir=OUT_DIR,sample_d='{sample}'),
+                "{outdir}/04.Bamsts/{sample_d}/depth.tsv.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+                "{outdir}/04.Bamsts/{sample_d}/insertsize.plot".format(outdir=OUT_DIR,sample_d='{sample}'),
+                "{outdir}/04.Bamsts/{sample_d}/region.tsv.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
+                "{outdir}/04.Bamsts/{sample_d}/uncover.bed".format(outdir=OUT_DIR,sample_d='{sample}')
+        log:
+                "{outdir}/log/bamstat_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
+        shell:
+                "{BAMST} -p {GENE_BED} -o {params.BAMST_outdir} {input}"
 
 # BaseRecalibrator 2 
 rule BaseRecalibrator2:
@@ -514,7 +515,7 @@ rule getVar2:
 		"{outdir}/log/get_var2_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
 	shell:
 		"""
-		if {getVar2_flag};
+		if [ {getVar2_flag} == 'True' ];
 		then
 			perl {BIN}/getVar2.pl -in {input.prefinal_out} -list {DATABASE}/all.gene.txt -acmglist {DATABASE}/ACMG78.list -o1 {output[0]} -o2 {output[1]} -o3 {output[2]} -o4 {output[3]}
 		else
