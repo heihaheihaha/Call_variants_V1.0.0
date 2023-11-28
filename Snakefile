@@ -190,6 +190,7 @@ rule ApplyBQSR:
 		f"""{gatk} ApplyBQSR -R {config['reference_panel_path']} \\
 			-I {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam \\
 			-O {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.bqsr.bam \\
+			-ip 100 \\
 			--bqsr-recal-file {config['output_dir']}/alignments/{config['sample_name']}.bwa.markdup.rg.bam.table"""
 
 rule index_bam2:
