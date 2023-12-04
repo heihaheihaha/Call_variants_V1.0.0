@@ -53,13 +53,12 @@ def process_directory(directory):
                 samples[sample_name][lane][read_key] = os.path.join(root, file)
     return samples
 
-
-directory_path = args.directory
-sample_data = process_directory(directory_path)
-json_data = json.dumps(sample_data, indent=4)
-print(json_data)
-
 if __name__ == '__main__':
+
+	directory_path = args.directory
+	sample_data = process_directory(directory_path)
+	json_data = json.dumps(sample_data, indent=4)
+	print(json_data)
 
 	if not args.output:
 		args.output = 'All_sample.json'
