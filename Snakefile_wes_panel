@@ -1,4 +1,4 @@
-# The snakemake workfollow of WES.Panel (JXH && WTY)
+# The snakemake workfollow of WES.Panel (JXH)
 
 import os 
 import json
@@ -99,6 +99,8 @@ rule fastp:
 		clean_R2 = "{outdir}/02.Clean/{sample_d}.clean.R2.fq.gz".format(outdir=OUT_DIR,sample_d='{sample}'),
 		json = "{outdir}/02.Clean/{sample_d}.fastp.json".format(outdir=OUT_DIR,sample_d='{sample}'),
 		html = "{outdir}/02.Clean/{sample_d}.fastp.html".format(outdir=OUT_DIR,sample_d='{sample}')
+	conda:
+                "{outdir}/conda_yml/fastp.yml".format(outdir=OUT_DIR)
 	log:
 		"{outdir}/log/fastp_{sample}.log".format(outdir=OUT_DIR,sample='{sample}')
 	shell:
@@ -201,6 +203,8 @@ rule bam_index:
 		temp("{outdir}/04.Mapping/{sample_d}.sorted.bam.bai".format(outdir=OUT_DIR,sample_d='{sample}')) 
 	log:
 		"{outdir}/log/bam_sort_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
+	conda:
+		"{outdir}/conda_yml/bwa_samtools.yml".format(outdir=OUT_DIR)
 	shell:
 		"samtools index {input} 2>{log}"
 
@@ -241,6 +245,8 @@ rule bqsr_bam_index:
 		protected("{outdir}/04.Mapping/{sample_d}.sorted.bqsr.bam.bai".format(outdir=OUT_DIR,sample_d='{sample}'))
 	log:
 		"{outdir}/log/BQSR_bam_{sample}_index.log".format(outdir=OUT_DIR,sample='{sample}')
+	conda:
+		"{outdir}/conda_yml/bwa_samtools.yml".format(outdir=OUT_DIR)
 	shell:
 		"samtools index {input} 2>{log}"
 
@@ -477,7 +483,6 @@ rule awk_select:
 		cut_args = "1-10,12-26,30-33,37,41,45,51-53,55-60,64,69,79,85,88,93-94,97,100-111,115"
 	shell:
 		"awk -F {params.awk_args} {input} | cut -f {params.cut_args} > {output} 2>{log}"
-
 
 rule progress:
 	input:
