@@ -1,4 +1,4 @@
-# The snakemake workfollow of WES.Panel (JXH)
+# The snakemake workfollow of WES.Panel (JXH && WTY)
 
 import os 
 import json
